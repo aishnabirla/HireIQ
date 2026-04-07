@@ -1,0 +1,16 @@
+ # Ignore uploaded resumes
+data/resumes/
+
+# Ignore job descriptions if needed
+data/job_descriptions/
+
+# Ignore database (has candidate data)
+resume_screener.db
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+# Ignore virtual environment if any
+venv/
+.env

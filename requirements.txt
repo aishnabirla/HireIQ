@@ -1,0 +1,10 @@
+pdfplumber
+spacy
+nltk
+scikit-learn
+streamlit
+bcrypt
+pandas
+fpdf2
+openpyxl
+sentence-transformers
