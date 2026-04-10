@@ -72,3 +72,28 @@ for filename in resume_files:
     print("=" * 70)
 
 print("\n Done.")
+
+
+
+
+
+
+
+
+# from src.parser import extract_text_from_pdf
+# from src.nlp import extract_candidate_name, extract_education
+
+# files = [
+#     'data/resumes/LAKSHAY GOEL_Data_Engineer.pdf',
+#     'data/resumes/Ankit_Sr_Data_Engineer.pdf',
+# ]
+# for f in files:
+#     text = extract_text_from_pdf(f)
+#     print('FILE:', f)
+#     print('Lines:', len(text.split(chr(10))))
+#     print('First 5 lines:')
+#     for i, line in enumerate(text.split(chr(10))[:5]):
+#         print(f'  {i}: {repr(line[:80])}')
+#     print('Name:', extract_candidate_name(text))
+#     print('Education:', extract_education(text)[:150])
+#     print()
