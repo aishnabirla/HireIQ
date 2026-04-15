@@ -10,10 +10,6 @@ nlp = spacy.load("en_core_web_sm")
 
 # ─────────────────────────────────────────────
 # SKILLS DATABASE
-# Purpose: FALLBACK only — catches skills that
-# may be phrased differently in resume vs JD.
-# Kept intentionally broad across all domains.
-# Layer 1 (JD-driven) is always primary.
 # ─────────────────────────────────────────────
 SKILLS_DATABASE = [
     # Programming
@@ -200,7 +196,6 @@ KNOWN_REAL_SKILLS = {
 
 # ─────────────────────────────────────────────
 # JOB TITLE WORDS — domain agnostic
-# Used to strip titles from name candidates
 # ─────────────────────────────────────────────
 JOB_TITLE_WORDS = {
     "engineer", "developer", "analyst", "scientist", "manager",
@@ -227,8 +222,6 @@ CONTACT_WORDS = {
 
 # ─────────────────────────────────────────────
 # ORG BLACKLIST
-# Prevents spaCy from tagging tech/domain terms
-# as organization names. Extended for all domains.
 # ─────────────────────────────────────────────
 ORG_BLACKLIST = {
     # Tech tools
@@ -250,11 +243,17 @@ ORG_BLACKLIST = {
 # NAME HELPERS
 # ─────────────────────────────────────────────
 def _collapse_spaced_name(text):
-    spaced = re.findall(r'(?:[A-Z] ){2,}[A-Z]', text)
+    """
+    Collapses spaced-out names like 'M O H A M M E D F A R I D H'
+    Handles both: single chars with spaces AND single chars with multiple spaces
+    """
+    # Pattern: 3+ single uppercase letters each separated by one or more spaces
+    spaced = re.findall(r'(?:[A-Z] +){2,}[A-Z]', text)
+    result = text
     for match in spaced:
-        collapsed = match.replace(' ', '')
-        text = text.replace(match, collapsed + ' ', 1)
-    return text
+        collapsed = re.sub(r'\s+', '', match)
+        result = result.replace(match, collapsed + ' ', 1)
+    return result
 
 
 def _is_valid_name(words):
@@ -273,8 +272,6 @@ def _is_valid_name(words):
 
 # ─────────────────────────────────────────────
 # NAME EXTRACTION — domain agnostic
-# Handles ALL CAPS, spaced names, label prefixes,
-# name+title combinations across all resume formats
 # ─────────────────────────────────────────────
 def extract_candidate_name(text):
     text_proc = _collapse_spaced_name(text)
@@ -296,16 +293,27 @@ def extract_candidate_name(text):
             continue
         if line.startswith('http') or 'linkedin' in line_lower:
             continue
-        if line_lower in RESUME_SECTION_WORDS:
-            continue
-        if any(line_lower.startswith(sw) for sw in RESUME_SECTION_WORDS):
-            continue
 
-        # Handle "LABEL: Value" format e.g. "NAME: Singam Vivek Kumar"
-        if ':' in line and len(line) < 60:
-            colon_part = line.split(':', 1)[1].strip()
-            if colon_part:
-                line = colon_part
+        # Handle "Name: Bharath" or "Name : Bharath" format
+        if ':' in line:
+            colon_parts = line.split(':', 1)
+            label = colon_parts[0].strip().lower()
+            value = colon_parts[1].strip()
+
+            # Only use colon value if label looks like a name label
+            if label in {'name', 'full name', 'candidate name'} and value:
+                cleaned = re.sub(r'[^\w\s\'-]', ' ', value).strip()
+                cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+                if cleaned.isupper():
+                    cleaned = cleaned.title()
+                words = cleaned.split()
+                if _is_valid_name(words):
+                    return cleaned
+                # Try first 2-3 words
+                if len(words) > 1 and _is_valid_name(words[:2]):
+                    return ' '.join(words[:2])
+            # Skip lines with colons that are not name labels
+            continue
 
         # Clean and normalise
         cleaned = re.sub(r'[^\w\s\'-]', ' ', line).strip()
@@ -313,6 +321,7 @@ def extract_candidate_name(text):
         if not cleaned:
             continue
 
+        # Normalise ALL CAPS to Title Case
         if cleaned.isupper():
             cleaned = cleaned.title()
 
@@ -322,8 +331,8 @@ def extract_candidate_name(text):
         if _is_valid_name(words):
             return cleaned
 
-        # Strip trailing title words
-        for trim in range(1, min(4, len(words))):
+        # Strip trailing title words one by one
+        for trim in range(1, min(5, len(words))):
             candidate = words[:len(words) - trim]
             if _is_valid_name(candidate):
                 return ' '.join(candidate)
@@ -335,8 +344,8 @@ def extract_candidate_name(text):
             if _is_valid_name(words[:2]):
                 return ' '.join(words[:2])
 
-    # spaCy PERSON fallback
-    doc = nlp(text_proc[:500])
+    # spaCy PERSON fallback — only on first 300 chars
+    doc = nlp(text_proc[:300])
     for ent in doc.ents:
         if ent.label_ == "PERSON":
             words = ent.text.strip().split()
@@ -356,8 +365,6 @@ def extract_candidate_name(text):
 
 # ─────────────────────────────────────────────
 # EDUCATION EXTRACTION — domain agnostic
-# Works for tech, medical, legal, business,
-# arts, teaching degrees equally
 # ─────────────────────────────────────────────
 def extract_education(text):
     # Broad degree keywords covering all domains
@@ -442,7 +449,6 @@ def extract_education(text):
 
 # ─────────────────────────────────────────────
 # EXPERIENCE EXTRACTION — domain agnostic
-# Works for any role — extracts years and orgs
 # ─────────────────────────────────────────────
 def extract_experience(text):
     found = []
@@ -574,10 +580,11 @@ def extract_skills(text, jd_text=None):
 # ─────────────────────────────────────────────
 def process_resume(text, jd_text=None):
     return {
-        "name": extract_candidate_name(text),
-        "email": extract_candidate_email(text),
-        "skills": extract_skills(text, jd_text),
-        "education": extract_education(text),
+        "name":       extract_candidate_name(text),
+        "email":      extract_candidate_email(text),
+        "phone":      extract_candidate_phone(text),
+        "skills":     extract_skills(text, jd_text),
+        "education":  extract_education(text),
         "experience": extract_experience(text)
     }
 
@@ -597,3 +604,26 @@ def extract_candidate_email(text):
     pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
     emails = re.findall(pattern, text)
     return emails[0] if emails else "Not provided"
+
+# ─────────────────────────────────────────────
+# PHONE EXTRACTION
+# ─────────────────────────────────────────────
+def extract_candidate_phone(text):
+    """
+    Extracts phone number from resume text.
+    Handles Indian (+91), US, and general formats.
+    """
+    patterns = [
+        r'\+91[\s\-]?\d{5}[\s\-]?\d{5}',        # +91 99999 99999
+        r'\+91[\s\-]?\d{10}',                      # +91 9999999999
+        r'\b91[\s\-]?\d{10}\b',                    # 91 9999999999
+        r'\+\d{1,3}[\s\-]?\d{9,12}',              # general international
+        r'\b\d{10}\b',                              # plain 10 digit
+        r'\(\d{3}\)[\s\-]?\d{3}[\s\-]?\d{4}',    # (123) 456-7890
+        r'\b\d{3}[\s\-]\d{3}[\s\-]\d{4}\b',       # 123-456-7890
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            return match.group().strip()
+    return "Not provided"

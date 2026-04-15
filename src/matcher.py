@@ -6,36 +6,100 @@ import re
 
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
+# def is_valid_jd(jd_text):
+#     """
+#     Validates that JD text is meaningful before scoring.
+#     Prevents junk input from getting non-zero scores.
+#     """
+#     if not jd_text or len(jd_text.strip()) < 50:
+#         return False
+
+#     # Must contain at least some real words (3+ chars)
+#     words = re.findall(r'\b[a-zA-Z]{3,}\b', jd_text)
+#     if len(words) < 10:
+#         return False
+
+#     # Must not be mostly special characters
+#     alpha_ratio = sum(c.isalpha() for c in jd_text) / len(jd_text)
+#     if alpha_ratio < 0.3:
+#         return False
+
+#     return True
+
+
+# def is_valid_resume(resume_text):
+#     """
+#     Validates resume text has meaningful content.
+#     """
+#     if not resume_text or len(resume_text.strip()) < 100:
+#         return False
+#     words = re.findall(r'\b[a-zA-Z]{3,}\b', resume_text)
+#     if len(words) < 20:
+#         return False
+#     return True
+
+import re
+
 def is_valid_jd(jd_text):
-    """
-    Validates that JD text is meaningful before scoring.
-    Prevents junk input from getting non-zero scores.
-    """
-    if not jd_text or len(jd_text.strip()) < 50:
+    if not jd_text or len(jd_text.strip()) < 100:
         return False
 
-    # Must contain at least some real words (3+ chars)
-    words = re.findall(r'\b[a-zA-Z]{3,}\b', jd_text)
-    if len(words) < 10:
+    text = jd_text.lower()
+
+    # Must contain hiring-related keywords
+    jd_keywords = [
+        "responsibilities", "requirements", "skills",
+        "experience", "qualification", "role", "job"
+    ]
+
+    keyword_hits = sum(1 for k in jd_keywords if k in text)
+
+    if keyword_hits < 2:
         return False
 
-    # Must not be mostly special characters
-    alpha_ratio = sum(c.isalpha() for c in jd_text) / len(jd_text)
-    if alpha_ratio < 0.3:
+    # Must contain verbs (basic check for meaningful sentences)
+    verbs = re.findall(r'\b(develop|build|manage|design|analyze|create|lead)\b', text)
+    if len(verbs) < 2:
         return False
 
     return True
 
-
 def is_valid_resume(resume_text):
-    """
-    Validates resume text has meaningful content.
-    """
-    if not resume_text or len(resume_text.strip()) < 100:
+    if not resume_text or len(resume_text.strip()) < 150:
         return False
-    words = re.findall(r'\b[a-zA-Z]{3,}\b', resume_text)
-    if len(words) < 20:
+
+    text = resume_text.lower()
+
+    resume_keywords = [
+        "education", "experience", "project", "skills",
+        "university", "college", "worked", "developed"
+    ]
+
+    keyword_hits = sum(1 for k in resume_keywords if k in text)
+
+    if keyword_hits < 2:
         return False
+
+    # Must contain at least one proper noun-like pattern (name detection)
+    name_pattern = re.findall(r'\b[A-Z][a-z]+\s[A-Z][a-z]+\b', resume_text)
+    if len(name_pattern) == 0:
+        return False
+
+    return True
+
+def is_semantically_valid(jd_text, resume_text):
+    """
+    Ensures both JD and resume are meaningful (not random text)
+    """
+    jd_words = set(re.findall(r'\b[a-zA-Z]{4,}\b', jd_text.lower()))
+    res_words = set(re.findall(r'\b[a-zA-Z]{4,}\b', resume_text.lower()))
+
+    overlap = jd_words.intersection(res_words)
+
+    # If almost no overlap → likely junk
+    if len(overlap) < 5:
+        return False
+
     return True
 
 # ---------------------------
@@ -385,6 +449,18 @@ def match_resume_to_jd(jd_text, resume_text):
             "matched_skills": [],
             "missing_skills": [],
             "error": "Could not extract text from resume"
+        }
+    if not is_semantically_valid(jd_text, resume_text):
+        return {
+            "final_score": 0.0,
+            "tfidf_score": 0.0,
+            "bert_score": 0.0,
+            "skill_score": 0.0,
+            "experience_score": 0.0,
+            "title_score": 0.0,
+            "matched_skills": [],
+            "missing_skills": [],
+            "error": "JD and Resume are not contextually related"
         }
 
     tfidf = calculate_tfidf_score(jd_text, resume_text)

@@ -812,8 +812,6 @@ import pandas as pd
 import re
 import os
 import tempfile
-# from src.auth import login_user, logout_user, is_logged_in, get_current_user
-# from src.auth import generate_otp, send_otp_email, reset_password
 from src.parser import extract_text_from_pdf, extract_text_from_string
 from src.nlp import process_resume, process_jd
 from src.matcher import match_resume_to_jd, rank_resumes
@@ -821,13 +819,11 @@ from src.database import (save_job_description, save_resume,
                            save_evaluation, get_evaluations_by_jd,
                            get_job_description_by_id)
 from src.exporter import export_csv, export_pdf, export_excel
-# from src.auth import (login_user, logout_user,
-#                        get_current_user, generate_otp,
-#                        send_otp_email, reset_password, is_admin)
 from src.auth import (login_user, logout_user, is_logged_in,
                        get_current_user, generate_otp,
                        send_otp_email, reset_password, is_admin)
-
+from src.matcher import is_valid_jd
+from src.matcher import is_valid_resume
 st.set_page_config(
     page_title="HireIQ",
     page_icon="🔍",
@@ -1088,72 +1084,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# def show_admin_panel():
-#     from src.auth import (admin_create_user, admin_get_all_users,
-#                            admin_delete_user, admin_reset_user_password, is_admin)
-
-#     if not is_admin():
-#         st.error("Access denied. Admin only.")
-#         return
-
-#     user = get_current_user()
-#     show_topbar(user, show_new_eval=False)
-
-#     st.markdown("### Admin Panel — User Management")
-#     st.markdown("---")
-
-#     # ── Create New User ──
-#     st.markdown("#### Create New HR User")
-#     with st.form("create_user_form"):
-#         new_name = st.text_input("Full Name", placeholder="e.g. Full Name")
-#         new_email = st.text_input("Email Address", placeholder="email id")
-#         new_password = st.text_input("Temporary Password", type="password",
-#                                       placeholder="Minimum 6 characters")
-#         new_role = st.selectbox("Role", ["hr", "admin"])
-#         create_submitted = st.form_submit_button(
-#             "Create Account", type="primary", use_container_width=True
-#         )
-#         if create_submitted:
-#             success, message = admin_create_user(new_name, new_email,
-#                                                   new_password, new_role)
-#             if success:
-#                 st.success(message)
-#             else:
-#                 st.error(message)
-
-#     st.markdown("---")
-
-#     # ── Existing Users ──
-#     st.markdown("#### All Users")
-#     users = admin_get_all_users()
-#     if users:
-#         for u in users:
-#             col1, col2, col3, col4, col5 = st.columns([2, 2.5, 1, 1.5, 1])
-#             with col1:
-#                 st.write(u['name'])
-#             with col2:
-#                 st.write(u['email'])
-#             with col3:
-#                 st.markdown(
-#                     f"<span style='background:#e8f0fe;color:#1a73e8;"
-#                     f"padding:2px 8px;border-radius:10px;font-size:0.8rem'>"
-#                     f"{u['role']}</span>",
-#                     unsafe_allow_html=True
-#                 )
-#             with col4:
-#                 st.caption(u['created_at'][:10])
-#             with col5:
-#                 current = get_current_user()
-#                 if u['email'] != current['email']:
-#                     if st.button("Delete", key=f"del_{u['id']}"):
-#                         admin_delete_user(u['id'])
-#                         st.rerun()
-#                 else:
-#                     st.caption("(you)")
-#     else:
-#         st.info("No users found")
-
-
 def show_admin_panel():
     from src.auth import (
         admin_create_user,
@@ -1356,33 +1286,9 @@ def show_progress_bar(current_step):
         unsafe_allow_html=True
     )
 
-
 # ─────────────────────────────────────────────
 #  TOP BAR
 # ─────────────────────────────────────────────
-# def show_topbar(user, show_new_eval=False):
-#     col1, col2, col3, col4 = st.columns([3, 2, 1, 1])
-#     with col1:
-#         st.markdown('<div class="topbar-brand">🔍 HireIQ</div>', unsafe_allow_html=True)
-#     with col2:
-#         st.markdown(
-#             f'<div class="topbar-user">👤 {user["name"]} &nbsp;|&nbsp; {user["email"]}</div>',
-#             unsafe_allow_html=True
-#         )
-#     with col3:
-#         if show_new_eval:
-#             if st.button("+ New Evaluation", type="primary", use_container_width=True):
-#                 st.session_state['page'] = 'dashboard'
-#                 st.session_state['wizard_step'] = 1
-#                 st.session_state['results'] = None
-#                 st.session_state['jd_text'] = None
-#                 st.session_state['jd_title'] = None
-#                 st.rerun()
-#     with col4:
-#         if st.button("Logout", use_container_width=True):
-#             logout_user()
-#             st.rerun()
-
 def show_topbar(user, show_new_eval=False):
     col1, col2, col3, col4 = st.columns([3, 2, 1, 1])
     with col1:
@@ -1507,7 +1413,6 @@ def show_dashboard():
     elif step == 3:
         show_step3()
 
-
 # ─────────────────────────────────────────────
 #  STEP 1 — JD Upload
 # ─────────────────────────────────────────────
@@ -1565,12 +1470,13 @@ def show_step1():
         if st.button("Next →", type="primary", use_container_width=True):
             if not jd_title:
                 st.error("Please enter a job title")
+
             elif not jd_text:
                 st.error("Please upload or paste a job description")
-            elif len(jd_text.strip()) < 50:
-                st.error("Job description is too short. Please provide a complete JD.")
-            elif len(re.findall(r'\b[a-zA-Z]{3,}\b', jd_text)) < 10:
-                st.error("Job description does not contain enough valid text. Please check your input.")
+
+            elif not is_valid_jd(jd_text):   # MAIN FIX
+                st.error("Invalid Job Description. Please provide a proper JD with roles, responsibilities, and requirements.")
+
             else:
                 st.session_state['jd_title'] = jd_title
                 st.session_state['jd_text'] = jd_text
@@ -1614,14 +1520,43 @@ def show_step2():
         if st.button("Next →", type="primary", use_container_width=True):
             if not resume_files:
                 st.error("Please upload at least one resume")
+
             else:
-                st.session_state['resume_files_data'] = [
-                    {"name": f.name, "data": f.read()} for f in resume_files
-                ]
-                st.session_state['wizard_step'] = 3
-                st.rerun()
+                import tempfile
+                valid_resumes = []
+                invalid_files = []
 
+                for f in resume_files:
+                    # Save temp file to extract text
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
+                        tmp.write(f.read())
+                        tmp_path = tmp.name
 
+                    resume_text = extract_text_from_pdf(tmp_path)
+                    os.unlink(tmp_path)
+
+                    # VALIDATION
+                    if not is_valid_resume(resume_text):
+                        invalid_files.append(f.name)
+                    else:
+                        valid_resumes.append({
+                            "name": f.name,
+                            "data": f.getvalue()  # keep original file
+                        })
+
+                # If all resumes invalid
+                if not valid_resumes:
+                    st.error("❌ All uploaded files are invalid resumes. Please upload proper resumes.")
+
+                else:
+                    # If some invalid
+                    if invalid_files:
+                        st.warning(f"⚠️ Skipped invalid resumes: {', '.join(invalid_files)}")
+
+                    # Save only valid resumes
+                    st.session_state['resume_files_data'] = valid_resumes
+                    st.session_state['wizard_step'] = 3
+                    st.rerun()
 # ─────────────────────────────────────────────
 #  STEP 3 — Evaluate
 # ─────────────────────────────────────────────
@@ -1680,24 +1615,45 @@ def show_step3():
             #     "education": resume_info['education'] or "Not found",
             #     "experience": resume_info['experience'] or "Not found"
             # })
+        #     results.append({
+        #     "name": resume_info['name'],
+        #     "email": resume_info['email'] or "Not provided",
+        #     "file_name": resume_data['name'],
+
+        #     "final_score": match_result['final_score'],
+        #     "tfidf_score": match_result.get('tfidf_score', 0),
+        #     "bert_score": match_result.get('bert_score', 0),
+        #     "skill_score": match_result.get('skill_score', 0),
+        #     "experience_score": match_result.get('experience_score', 0),
+        #     "title_score": match_result.get('title_score', 0),
+
+        #     "matched_skills": match_result.get('matched_skills', []),
+        #     "missing_skills": match_result.get('missing_skills', []),
+
+        #     "education": resume_info['education'] or "Not found",
+        #     "experience": resume_info['experience'] or "Not found"
+        # })
+# ─────────────────────────────────────────────
+# CHANGE 1 — In show_step3()
+# ─────────────────────────────────────────────
+ 
             results.append({
-            "name": resume_info['name'],
-            "email": resume_info['email'] or "Not provided",
-            "file_name": resume_data['name'],
-
-            "final_score": match_result['final_score'],
-            "tfidf_score": match_result.get('tfidf_score', 0),
-            "bert_score": match_result.get('bert_score', 0),
-            "skill_score": match_result.get('skill_score', 0),
-            "experience_score": match_result.get('experience_score', 0),
-            "title_score": match_result.get('title_score', 0),
-
-            "matched_skills": match_result.get('matched_skills', []),
-            "missing_skills": match_result.get('missing_skills', []),
-
-            "education": resume_info['education'] or "Not found",
-            "experience": resume_info['experience'] or "Not found"
-        })
+                "name":             resume_info['name'],
+                "email":            resume_info['email'] or "Not provided",
+                "phone":            resume_info.get('phone', 'Not provided'),
+                "file_name":        resume_data['name'],
+                "final_score":      match_result['final_score'],
+                "tfidf_score":      match_result.get('tfidf_score', 0),
+                "bert_score":       match_result.get('bert_score', 0),
+                "skill_score":      match_result.get('skill_score', 0),
+                "experience_score": match_result.get('experience_score', 0),
+                "title_score":      match_result.get('title_score', 0),
+                "matched_skills":   match_result.get('matched_skills', []),
+                "missing_skills":   match_result.get('missing_skills', []),
+                "education":        resume_info['education'] or "Not found",
+                "experience":       resume_info['experience'] or "Not found"
+            })
+ 
             progress = int(((i + 1) / len(resume_files_data)) * 100)
 
             progress_bar.progress(progress)
@@ -1738,6 +1694,61 @@ def show_step3():
         if st.button("← Back", use_container_width=True):
             st.session_state['wizard_step'] = 2
             st.rerun()
+
+# ─────────────────────────────────────────────
+# CHANGE 2 — Add this helper function in app.py
+# ─────────────────────────────────────────────
+ 
+def generate_score_reason(c):
+    """
+    Generates a one-line natural language explanation
+    of why a candidate received their score.
+    Based purely on the numeric scores — no AI call.
+    """
+    bert  = c.get('bert_score', 0)
+    skill = c.get('skill_score', 0)
+    exp   = c.get('experience_score', 0)
+    title = c.get('title_score', 0)
+    missing = c.get('missing_skills', [])
+ 
+    parts = []
+ 
+    # Semantic match assessment
+    if bert >= 75:
+        parts.append("Strong semantic match with JD")
+    elif bert >= 55:
+        parts.append("Moderate semantic alignment with JD")
+    else:
+        parts.append("Limited semantic overlap with JD")
+ 
+    # Skill assessment
+    if skill >= 78:
+        parts.append("excellent skill coverage")
+    elif skill >= 65:
+        parts.append("good skill coverage")
+    elif skill >= 40:
+        parts.append("partial skill match")
+    else:
+        parts.append("low skill match")
+ 
+    # Experience assessment
+    if exp >= 0.95:
+        parts.append("experience perfectly fits requirement")
+    elif exp >= 0.80:
+        parts.append("slightly overqualified on experience")
+    elif exp >= 0.60:
+        parts.append("slightly under required experience")
+    else:
+        parts.append("experience below requirement")
+ 
+    # Missing skills note
+    if missing:
+        top_missing = ", ".join(missing[:3])
+        if len(missing) > 3:
+            top_missing += f" +{len(missing)-3} more"
+        parts.append(f"gaps in: {top_missing}")
+ 
+    return ". ".join(parts[:3]) + "."
 
 # ─────────────────────────────────────────────
 #  RESULTS PAGE
@@ -1784,18 +1795,70 @@ def show_results_page():
         for i, c in enumerate(filtered):
             score = c['final_score']
             badge = "🟢 Strong" if score >= 70 else "🟡 Partial" if score >= 40 else "🔴 Weak"
-
+ 
             with st.expander(
                 f"#{i+1}  {c['name']}  —  {score}%  {badge}",
                 expanded=(i == 0)
             ):
-                left, right = st.columns([1, 2])
-                with left:
-                    st.metric("Final Score", f"{score}%")
-                    st.metric("Skill Match", f"{c['skill_score']}%")
-                    st.caption(f"Email: {c['email']}")
-                    st.caption(f"Resume: {c['file_name']}")
-                with right:
+                # ── Why this score ──
+                reason = generate_score_reason(c)
+                st.markdown(
+                    f'<div style="background:#f0f4ff;border-left:3px solid #1a73e8;'
+                    f'padding:0.6rem 1rem;border-radius:6px;font-size:0.84rem;'
+                    f'color:#444;margin-bottom:1rem;">💡 {reason}</div>',
+                    unsafe_allow_html=True
+                )
+ 
+                # ── Score metrics row ──
+                m1, m2, m3, m4, m5 = st.columns(5)
+                with m1:
+                    st.metric("Final", f"{score}%")
+                with m2:
+                    st.metric("Skill", f"{c.get('skill_score', 0)}%")
+                with m3:
+                    st.metric("BERT", f"{c.get('bert_score', 0)}%")
+                with m4:
+                    st.metric("Exp", f"{c.get('experience_score', 0)}%")
+                with m5:
+                    st.metric("Title", f"{c.get('title_score', 0)}%")
+ 
+                st.markdown("---")
+ 
+                # ── Basic info row ──
+                info1, info2 = st.columns(2)
+                with info1:
+                    st.markdown("**👤 Candidate Info**")
+                    st.caption(f"📧 {c['email']}")
+                    phone = c.get('phone', 'Not provided')
+                    st.caption(f"📞 {phone}")
+                    st.caption(f"📄 {c['file_name']}")
+ 
+                with info2:
+                    st.markdown("**💼 Experience**")
+                    exp_text = c.get('experience', 'Not found')
+                    if exp_text and exp_text not in ['None', 'Not found', 'none']:
+                        # Show only the years part cleanly
+                        exp_parts = exp_text.split('|')
+                        for part in exp_parts[:2]:
+                            part = part.strip()
+                            if part and part != 'Not found':
+                                st.caption(part)
+                    else:
+                        st.caption("Not found")
+ 
+                    st.markdown("**🎓 Education**")
+                    edu = c.get('education', 'Not found')
+                    if edu and edu not in ['None', 'Not found', 'none']:
+                        edu_short = edu[:120] + '...' if len(edu) > 120 else edu
+                        st.caption(edu_short)
+                    else:
+                        st.caption("Not found")
+ 
+                st.markdown("---")
+ 
+                # ── Skills row ──
+                sk1, sk2 = st.columns(2)
+                with sk1:
                     st.markdown("**✅ Matched Skills**")
                     if c['matched_skills']:
                         badges = " ".join([
@@ -1805,8 +1868,8 @@ def show_results_page():
                         st.markdown(badges, unsafe_allow_html=True)
                     else:
                         st.caption("None matched")
-
-                    st.markdown("<br>", unsafe_allow_html=True)
+ 
+                with sk2:
                     st.markdown("**❌ Missing Skills**")
                     if c['missing_skills']:
                         badges = " ".join([
@@ -1817,25 +1880,8 @@ def show_results_page():
                     else:
                         st.caption("No missing skills")
 
-                st.markdown("---")
-                edu = c['education']
-                exp = c['experience']
-                if edu and edu not in ['None', 'Not found', 'none']:
-                    st.caption(f"Education: {edu}")
-                if exp and exp not in ['None', 'Not found', 'none']:
-                    st.caption(f"Experience: {exp}")
-
     # ── Table View ──
     else:
-        # df = pd.DataFrame([{
-        #     "Rank": i + 1,
-        #     "Name": r['name'],
-        #     "Email": r['email'],
-        #     "Final Score (%)": r['final_score'],
-        #     "Skill Match (%)": r['skill_score'],
-        #     "Matched Skills": ", ".join(r['matched_skills']) if isinstance(r['matched_skills'], list) else str(r['matched_skills']),
-        #     "Missing Skills": ", ".join(r['missing_skills']) if isinstance(r['missing_skills'], list) else str(r['missing_skills']),
-        # } for i, r in enumerate(filtered)])
         df = pd.DataFrame([{
             "Rank":           i + 1,
             "Name":           r['name'],
@@ -1884,32 +1930,6 @@ def show_results_page():
 # ─────────────────────────────────────────────
 #  MAIN
 # ─────────────────────────────────────────────
-# def main():
-#     # FIX: initialise ALL session state keys upfront so no key is ever missing
-#     # mid-render, which was causing session flicker on first load
-#     defaults = {
-#         'logged_in': False,
-#         'page': 'login',
-#         'user': None,
-#         'wizard_step': 1,
-#         'jd_text': None,
-#         'jd_title': None,
-#         'results': None,
-#         'show_jd_preview': False,
-#         'show_jd_results': False,
-#         'otp_sent': False,
-#     }
-#     for key, val in defaults.items():
-#         if key not in st.session_state:
-#             st.session_state[key] = val
-
-#     if not st.session_state['logged_in']:
-#         show_login_page()
-#     elif st.session_state['page'] == 'results':
-#         show_results_page()
-#     else:
-#         show_dashboard()
-
 def main():
     if 'logged_in' not in st.session_state:
         st.session_state['logged_in'] = False
