@@ -6,64 +6,37 @@ import re
 
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
-# def is_valid_jd(jd_text):
-#     """
-#     Validates that JD text is meaningful before scoring.
-#     Prevents junk input from getting non-zero scores.
-#     """
-#     if not jd_text or len(jd_text.strip()) < 50:
-#         return False
-
-#     # Must contain at least some real words (3+ chars)
-#     words = re.findall(r'\b[a-zA-Z]{3,}\b', jd_text)
-#     if len(words) < 10:
-#         return False
-
-#     # Must not be mostly special characters
-#     alpha_ratio = sum(c.isalpha() for c in jd_text) / len(jd_text)
-#     if alpha_ratio < 0.3:
-#         return False
-
-#     return True
-
-
-# def is_valid_resume(resume_text):
-#     """
-#     Validates resume text has meaningful content.
-#     """
-#     if not resume_text or len(resume_text.strip()) < 100:
-#         return False
-#     words = re.findall(r'\b[a-zA-Z]{3,}\b', resume_text)
-#     if len(words) < 20:
-#         return False
-#     return True
-
-import re
-
 def is_valid_jd(jd_text):
     if not jd_text or len(jd_text.strip()) < 100:
         return False
 
     text = jd_text.lower()
 
-    # Must contain hiring-related keywords
+    #Flexible keyword detection
     jd_keywords = [
-        "responsibilities", "requirements", "skills",
+        "responsibility", "requirement", "skill",
         "experience", "qualification", "role", "job"
     ]
 
     keyword_hits = sum(1 for k in jd_keywords if k in text)
 
+    #Allow plural variations automatically
     if keyword_hits < 2:
         return False
 
-    # Must contain verbs (basic check for meaningful sentences)
+    #Check for bullet structure (VERY IMPORTANT)
+    bullet_lines = re.findall(r'(•|-|\*)', jd_text)
+
+    if len(bullet_lines) >= 3:
+        return True  # valid JD (skills-based JD)
+
+    #Fallback: sentence-based JD check
     verbs = re.findall(r'\b(develop|build|manage|design|analyze|create|lead)\b', text)
-    if len(verbs) < 2:
-        return False
 
-    return True
+    if len(verbs) >= 1:
+        return True
 
+    return False
 def is_valid_resume(resume_text):
     if not resume_text or len(resume_text.strip()) < 150:
         return False

@@ -1219,14 +1219,31 @@ def format_jd_for_display(text):
     lines = text.strip().split('\n')
     html_lines = []
 
+    # Keywords that indicate a section heading
+    # Matched using 'contains' not exact equality
+    # so "Required Qualifications" matches "required"
     heading_keywords = [
-        "responsibilities", "requirements", "qualifications",
-        "skills", "experience", "education", "about",
-        "overview", "summary", "benefits", "nice to have",
-        "preferred", "required", "key skills", "job description",
-        "who you are", "what you'll do", "what we offer",
-        "role", "position", "duties", "profile",
-        "about the role", "about the company", "about us",
+        "responsibility", "responsibilities",
+        "requirement", "requirements",
+        "qualification", "qualifications",
+        "preferred", "preference",
+        "nice to have", "nice-to-have",
+        "good to have",
+        "must have", "must-have",
+        "key skills", "technical skills",
+        "skills required", "required skills",
+        "education",
+        "about the role", "about the job",
+        "about us", "about the company",
+        "who you are", "what you will do",
+        "what you'll do", "what we offer",
+        "benefits", "perks",
+        "overview", "summary", "objective",
+        "job description", "role", "position",
+        "duties", "profile", "key responsibilities",
+        "minimum qualifications",
+        "basic qualifications",
+        "additional qualifications",
     ]
 
     for line in lines:
@@ -1234,13 +1251,30 @@ def format_jd_for_display(text):
         if not line:
             continue
 
-        line_lower = line.lower().rstrip(':').strip()
+        line_lower = line.lower().strip().rstrip(':').strip()
+
+        # Check 1: line ends with colon and is short
+        ends_with_colon = line.endswith(':') and len(line) < 80
+
+        # Check 2: line contains a heading keyword
+        # Uses 'in' so "Required Qualifications" matches "requirement"
+        contains_keyword = any(kw in line_lower for kw in heading_keywords)
+
+        # Check 3: short ALL-CAPS line (e.g. "KEY SKILLS")
+        is_all_caps = line.isupper() and len(line) < 60
+
+        # Check 4: short line (under 55 chars) that contains a keyword
+        # This catches "Nice to Have" or "Preferred" without colon
+        is_short_keyword_line = (
+            len(line) < 55
+            and contains_keyword
+            and not line.startswith(('•', '-', '*', '●', '○', '▪', '◦'))
+        )
 
         is_heading = (
-            (len(line) < 60 and line.endswith(':'))
-            or any(line_lower == kw or line_lower == kw + ':'
-                   for kw in heading_keywords)
-            or (len(line) < 50 and line.isupper())
+            ends_with_colon
+            or is_all_caps
+            or is_short_keyword_line
         )
 
         is_bullet = line.startswith(('•', '-', '*', '●', '○', '▪', '◦'))

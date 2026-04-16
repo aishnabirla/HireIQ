@@ -107,8 +107,6 @@ STOP_WORDS = set(stopwords.words('english'))
 
 # ─────────────────────────────────────────────
 # NOISE WORDS
-# Generic words that appear in JDs but are not
-# skills — domain agnostic filter
 # ─────────────────────────────────────────────
 NOISE_WORDS = {
     # Qualifiers
@@ -140,7 +138,6 @@ NOISE_WORDS = {
 
 # ─────────────────────────────────────────────
 # SECTION HEADERS
-# Used only to filter Layer 1 JD extraction
 # ─────────────────────────────────────────────
 SECTION_HEADERS = {
     "objective", "summary", "projects", "certifications",
@@ -156,8 +153,6 @@ RESUME_SECTION_WORDS = {
 }
 # ─────────────────────────────────────────────
 # KNOWN REAL SKILLS WHITELIST
-# Multi-word phrases that look like noise but
-# are genuine skills — domain agnostic
 # ─────────────────────────────────────────────
 KNOWN_REAL_SKILLS = {
     # Tech
@@ -244,17 +239,27 @@ ORG_BLACKLIST = {
 # ─────────────────────────────────────────────
 def _collapse_spaced_name(text):
     """
-    Collapses spaced-out names like 'M O H A M M E D F A R I D H'
-    Handles both: single chars with spaces AND single chars with multiple spaces
+    Collapses spaced names like 'M O H A M M E D F A R I D H'
+    Detects word boundaries by looking for 2+ consecutive spaced single letters
+    then a gap of 2+ spaces before another group starts.
     """
-    # Pattern: 3+ single uppercase letters each separated by one or more spaces
-    spaced = re.findall(r'(?:[A-Z] +){2,}[A-Z]', text)
+    # Match groups of single uppercase letters separated by single spaces
+    # Groups are separated from each other by 2+ spaces
+    pattern = r'(?:[A-Z] +){2,}[A-Z]'
+    spaced = re.findall(pattern, text)
     result = text
     for match in spaced:
-        collapsed = re.sub(r'\s+', '', match)
+        # Split by 2+ spaces to find word boundaries within the match
+        parts = re.split(r' {2,}', match.strip())
+        if len(parts) > 1:
+            # Multiple groups — collapse each separately and join with space
+            collapsed = ' '.join(p.replace(' ', '') for p in parts)
+        else:
+            # Single group — collapse all letters together
+            # Try to detect first/last name boundary by double space
+            collapsed = match.replace(' ', '').strip()
         result = result.replace(match, collapsed + ' ', 1)
     return result
-
 
 def _is_valid_name(words):
     if not (2 <= len(words) <= 3):
@@ -294,28 +299,31 @@ def extract_candidate_name(text):
         if line.startswith('http') or 'linkedin' in line_lower:
             continue
 
-        # Handle "Name: Bharath" or "Name : Bharath" format
+        # ── Handle "Name: Bharath" format ──
         if ':' in line:
             colon_parts = line.split(':', 1)
             label = colon_parts[0].strip().lower()
             value = colon_parts[1].strip()
-
-            # Only use colon value if label looks like a name label
             if label in {'name', 'full name', 'candidate name'} and value:
+                # Remove any trailing job title words
                 cleaned = re.sub(r'[^\w\s\'-]', ' ', value).strip()
                 cleaned = re.sub(r'\s+', ' ', cleaned).strip()
                 if cleaned.isupper():
                     cleaned = cleaned.title()
                 words = cleaned.split()
-                if _is_valid_name(words):
-                    return cleaned
-                # Try first 2-3 words
-                if len(words) > 1 and _is_valid_name(words[:2]):
-                    return ' '.join(words[:2])
-            # Skip lines with colons that are not name labels
-            continue
+                # Return first valid name portion
+                for end in range(len(words), 0, -1):
+                    candidate = words[:end]
+                    if _is_valid_name(candidate):
+                        return ' '.join(candidate)
+                # If no multi-word valid name, return single word if it looks like a name
+                if len(words) >= 1 and words[0].replace("'","").isalpha():
+                    w = words[0]
+                    if w.lower() not in JOB_TITLE_WORDS and w.lower() not in CONTACT_WORDS:
+                        return w.capitalize()
+            continue  # skip all other colon lines
 
-        # Clean and normalise
+        # Clean line
         cleaned = re.sub(r'[^\w\s\'-]', ' ', line).strip()
         cleaned = re.sub(r'\s+', ' ', cleaned).strip()
         if not cleaned:
@@ -327,11 +335,22 @@ def extract_candidate_name(text):
 
         words = cleaned.split()
 
+        # ── Handle collapsed single-word full name like MOHAMMEDFARIDH ──
+        # If it is one long word, all alpha, no spaces — try splitting at uppercase
+        if len(words) == 1 and len(words[0]) > 6 and words[0].replace("'","").isalpha():
+            word = words[0]
+            # Find uppercase boundaries e.g. MohammedFaridh
+            parts = re.findall(r'[A-Z][a-z]+', word.title())
+            if 2 <= len(parts) <= 3 and all(p.replace("'","").isalpha() for p in parts):
+                candidate = ' '.join(parts)
+                if _is_valid_name(candidate.split()):
+                    return candidate
+
         # Direct 2-3 word name check
         if _is_valid_name(words):
             return cleaned
 
-        # Strip trailing title words one by one
+        # Strip trailing title words
         for trim in range(1, min(5, len(words))):
             candidate = words[:len(words) - trim]
             if _is_valid_name(candidate):
@@ -344,7 +363,7 @@ def extract_candidate_name(text):
             if _is_valid_name(words[:2]):
                 return ' '.join(words[:2])
 
-    # spaCy PERSON fallback — only on first 300 chars
+    # spaCy PERSON fallback — only first 300 chars
     doc = nlp(text_proc[:300])
     for ent in doc.ents:
         if ent.label_ == "PERSON":
@@ -352,7 +371,7 @@ def extract_candidate_name(text):
             if _is_valid_name(words):
                 return ent.text.strip().title()
 
-    # ALL CAPS regex fallback
+    # ALL CAPS two-word regex fallback
     for line in lines[:10]:
         cleaned = re.sub(r'[^\w\s]', ' ', line).strip()
         if re.match(r'^[A-Z]{2,}(?:\s[A-Z]{2,}){1,2}$', cleaned):
@@ -361,7 +380,6 @@ def extract_candidate_name(text):
                 return title
 
     return "Candidate"
-
 
 # ─────────────────────────────────────────────
 # EDUCATION EXTRACTION — domain agnostic

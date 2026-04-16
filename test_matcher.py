@@ -17,33 +17,33 @@
 
 
 
-# from src.parser import extract_text_from_pdf
-# from src.nlp import extract_candidate_name
-
-# files = [
-#     'data/resumes/MOHAMMED FARIDH_Data_Engineer.pdf',
-#     'data/resumes/Bharath Servicenow HRSD.pdf',
-# ]
-# for f in files:
-#     from src.parser import extract_text_from_pdf
-#     text = extract_text_from_pdf(f)
-#     print(f.split('/')[-1], '->', extract_candidate_name(text))
-
-
-
-
 from src.parser import extract_text_from_pdf
-from src.nlp import _collapse_spaced_name
+from src.nlp import extract_candidate_name
 
 files = [
     'data/resumes/MOHAMMED FARIDH_Data_Engineer.pdf',
     'data/resumes/Bharath Servicenow HRSD.pdf',
 ]
 for f in files:
+    from src.parser import extract_text_from_pdf
     text = extract_text_from_pdf(f)
-    text_proc = _collapse_spaced_name(text)
-    print('FILE:', f.split('/')[-1])
-    for i, l in enumerate(text_proc.split(chr(10))[:10]):
-        print(f'  {i}: {repr(l)}')
-    print()
+    print(f.split('/')[-1], '->', extract_candidate_name(text))
+
+
+
+
+# from src.parser import extract_text_from_pdf
+# from src.nlp import _collapse_spaced_name
+
+# files = [
+#     'data/resumes/MOHAMMED FARIDH_Data_Engineer.pdf',
+#     'data/resumes/Bharath Servicenow HRSD.pdf',
+# ]
+# for f in files:
+#     text = extract_text_from_pdf(f)
+#     text_proc = _collapse_spaced_name(text)
+#     print('FILE:', f.split('/')[-1])
+#     for i, l in enumerate(text_proc.split(chr(10))[:10]):
+#         print(f'  {i}: {repr(l)}')
+#     print()
 
