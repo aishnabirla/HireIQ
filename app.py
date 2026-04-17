@@ -1145,11 +1145,17 @@ def show_results_page():
 #  MAIN
 # ─────────────────────────────────────────────
 def main():
-    # Auto-create database if it does not exist
-    import os
-    if not os.path.exists('resume_screener.db'):
-        import subprocess
-        subprocess.run(['python', 'setup_db.py'], check=True)
+    # Use /tmp for DB — Streamlit Cloud root dir is read-only
+    DB_PATH = "/tmp/resume_screener.db"
+
+    if not os.path.exists(DB_PATH):
+        try:
+            import setup_db          # direct import, no subprocess
+            setup_db.initialize()    # we'll create this function below
+        except Exception as e:
+            st.error(f"Database setup failed: {e}")
+            st.stop()
+
     if 'logged_in' not in st.session_state:
         st.session_state['logged_in'] = False
     if 'page' not in st.session_state:
