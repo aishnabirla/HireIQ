@@ -6,7 +6,19 @@ from nltk.corpus import stopwords
 nltk.download('stopwords', quiet=True)
 nltk.download('punkt', quiet=True)
 
-nlp = spacy.load("en_core_web_sm")
+import spacy
+import subprocess
+import sys
+
+try:
+    nlp = spacy.load("en_core_web_sm")
+except Exception as e:
+    print("Downloading spaCy model...")
+    subprocess.run(
+        [sys.executable, "-m", "spacy", "download", "en_core_web_sm"],
+        check=True
+    )
+    nlp = spacy.load("en_core_web_sm")
 
 # ─────────────────────────────────────────────
 # SKILLS DATABASE
