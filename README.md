@@ -11,7 +11,7 @@ HireIQ is a fully local, AI-powered resume screening web app. Upload a Job Descr
 
 ---
 
-## 🚀 Live Demo
+## Live Demo
 
 🔗 **[https://hireiq-fpsb54fa7o4pkm8wxljhk8.streamlit.app](https://hireiq-fpsb54fa7o4pkm8wxljhk8.streamlit.app)**
 
@@ -22,7 +22,7 @@ Password: hr@123
 
 ---
 
-## ✨ Features
+## Features
 
 - Upload JD as PDF, TXT, or pasted text
 - Bulk upload candidate resumes (PDF)
@@ -35,7 +35,7 @@ Password: hr@123
 
 ---
 
-## 🧠 Scoring System
+## Scoring System
 
 HireIQ uses a **weighted hybrid model** combining semantic AI, traditional ML, and rule-based NLP:
 
@@ -84,7 +84,7 @@ Final Skill Score = (0.85 × required_score) + (0.15 × preferred_score)
 
 ---
 
-## 🗂️ Architecture
+## Architecture
 
 ```
 hireiq/
@@ -119,7 +119,7 @@ hireiq/
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |---|---|
@@ -136,7 +136,7 @@ hireiq/
 
 ---
 
-## ⚙️ Local Setup
+## Local Setup
 
 ### Prerequisites
 - Python 3.11.9
@@ -166,7 +166,7 @@ Open `http://localhost:8501` and login with `hr@strive4x.com` / `hr@123`.
 
 ---
 
-## 🗄️ Database Schema
+## Database Schema
 
 ```sql
 users            (id, name, email, password_hash, role, created_at)
@@ -178,7 +178,7 @@ evaluations      (id, resume_id, jd_id, match_score, matched_skills,
 
 ---
 
-## 📤 Deployment
+## Deployment
 
 Deployed on **Streamlit Cloud**. Key configuration:
 
@@ -194,7 +194,7 @@ Database writes to `/tmp/resume_screener.db` since the Streamlit Cloud root file
 
 ---
 
-## 🔄 User Flow
+## User Flow
 
 ```
 Login
@@ -207,7 +207,7 @@ Login
 
 ---
 
-## 📈 Scoring Evolution
+## Scoring Evolution
 
 | Version | Weights | Peak Score |
 |---|---|---|
