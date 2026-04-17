@@ -1,14 +1,14 @@
 import spacy
 import re
-import subprocess
-import sys
 import nltk
 from nltk.corpus import stopwords
 
 nltk.download('stopwords', quiet=True)
 nltk.download('punkt', quiet=True)
+nltk.download('punkt_tab', quiet=True)
 
-# Load spaCy model (already installed via requirements.txt)
+# Clean load — model installed via requirements.txt
+# Do NOT attempt runtime download — fails on Streamlit Cloud
 nlp = spacy.load("en_core_web_sm")
 
 # ─────────────────────────────────────────────
