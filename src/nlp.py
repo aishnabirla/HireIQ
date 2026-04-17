@@ -7,10 +7,14 @@ nltk.download('stopwords', quiet=True)
 nltk.download('punkt', quiet=True)
 nltk.download('punkt_tab', quiet=True)
 
-# Clean load — model installed via requirements.txt
-# Do NOT attempt runtime download — fails on Streamlit Cloud
-nlp = spacy.load("en_core_web_sm")
-
+# Load spacy model installed via requirements.txt whl
+try:
+    nlp = spacy.load("en_core_web_sm")
+except OSError:
+    raise RuntimeError(
+        "spacy model 'en_core_web_sm' not found. "
+        "Ensure the .whl URL is present in requirements.txt"
+    )
 # ─────────────────────────────────────────────
 # SKILLS DATABASE
 # ─────────────────────────────────────────────
